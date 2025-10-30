@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Chroma 维护工具 UI</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif; margin: 24px; }
+    h1 { margin: 0 0 16px; font-size: 20px; }
+    fieldset { border: 1px solid #ddd; padding: 12px; margin-bottom: 16px; }
+    legend { color: #333; padding: 0 8px; }
+    label { display: inline-block; min-width: 160px; margin-right: 8px; }
+    input[type="text"] { width: 420px; }
+    button { margin-right: 8px; padding: 6px 12px; }
+    .row { margin: 6px 0; }
+    #out { white-space: pre-wrap; background: #fafafa; border: 1px solid #eee; padding: 12px; min-height: 240px; }
+    .small { font-size: 12px; color: #666; }
+  </style>
+</head>
+<body>
+  <h1>Chroma 维护工具 UI</h1>
+
+  <fieldset>
+    <legend>连接参数</legend>
+    <div class="row">
+      <label for="base">维护服务地址</label>
+      <input id="base" type="text" value="http://localhost:8001" />
+      <span class="small">例如：http://localhost:8001</span>
+    </div>
+    <div class="row">
+      <label for="vsdir">向量库目录</label>
+      <input id="vsdir" type="text" value="./RAG/chroma_db" />
+    </div>
+    <div class="row">
+      <label for="coll">集合名</label>
+      <input id="coll" type="text" value="my_collection_dim1024" />
+    </div>
+    <div class="row">
+      <label for="raw">返回原始文档</label>
+      <input id="raw" type="checkbox" />
+    </div>
+  </fieldset>
+
+  <fieldset>
+    <legend>查询与维护</legend>
+    <div class="row">
+      <button onclick="listCollections()">列出集合 (/collections)</button>
+    </div>
+    <div class="row">
+      <button onclick="listSources()">列出来源 (/sources)</button>
+    </div>
+    <div class="row">
+      <button onclick="listEntities()">列出实体 (/entities)</button>
+    </div>
+    <div class="row">
+      <label for="src">按 source 删除</label>
+      <input id="src" type="text" placeholder="例如：test_knowledge.txt" />
+      <button onclick="deleteBySource()">删除 (/delete_by_source)</button>
+    </div>
+  </fieldset>
+
+  <fieldset>
+    <legend>导入知识库</legend>
+    <div class="row">
+      <label for="kb">知识库目录</label>
+      <input id="kb" type="text" value="./RAG/knowledge_base" />
+    </div>
+    <div class="row">
+      <label for="emb">嵌入模型</label>
+      <input id="emb" type="text" value="text-embedding-v4" />
+    </div>
+    <div class="row">
+      <button onclick="ingestKB()">导入 (/ingest)</button>
+    </div>
+  </fieldset>
+
+  <h3>结果</h3>
+  <div id="out"></div>
+
+  <script>
+    function getBase() { return document.getElementById('base').value.trim(); }
+    function getVsDir() { return document.getElementById('vsdir').value.trim(); }
+    function getColl() { return document.getElementById('coll').value.trim(); }
+    function getRaw() { return document.getElementById('raw').checked; }
+    function getSrc() { return document.getElementById('src').value.trim(); }
+    function getKb() { return document.getElementById('kb').value.trim(); }
+    function getEmb() { return document.getElementById('emb').value.trim(); }
+    function show(data) { document.getElementById('out').textContent = JSON.stringify(data, null, 2); }
+    function url(path, params) { const q = new URLSearchParams(params); return `${getBase()}${path}?${q.toString()}`; }
+
+    async function getJson(u) {
+      try {
+        const resp = await fetch(u, { method: 'GET' });
+        const data = await resp.json();
+        return data;
+      } catch (e) {
+        return { status: 'error', message: String(e), url: u };
+      }
+    }
+
+    async function listCollections() {
+      const u = url('/collections', { vectorstore_dir: getVsDir() });
+      show({ loading: true, url: u });
+      const data = await getJson(u);
+      show(data);
+    }
+
+    async function listSources() {
+      const coll = getColl();
+      if (!coll) { return show({ status: 'error', message: '缺少集合名' }); }
+      const u = url('/sources', { vectorstore_dir: getVsDir(), collection_name: coll });
+      show({ loading: true, url: u });
+      const data = await getJson(u);
+      show(data);
+    }
+
+    async function listEntities() {
+      const coll = getColl();
+      if (!coll) { return show({ status: 'error', message: '缺少集合名' }); }
+      const raw = getRaw();
+      const u = url('/entities', { vectorstore_dir: getVsDir(), collection_name: coll, raw: raw ? 1 : 0 });
+      show({ loading: true, url: u });
+      const data = await getJson(u);
+      show(data);
+    }
+
+    async function deleteBySource() {
+      const coll = getColl(); const src = getSrc();
+      if (!coll || !src) { return show({ status: 'error', message: '缺少集合名或source' }); }
+      const u = url('/delete_by_source', { vectorstore_dir: getVsDir(), collection_name: coll, source_name: src });
+      show({ loading: true, url: u });
+      const data = await getJson(u);
+      show(data);
+    }
+
+    async function ingestKB() {
+      const coll = getColl();
+      if (!coll) { return show({ status: 'error', message: '缺少集合名' }); }
+      const u = url('/ingest', { vectorstore_dir: getVsDir(), collection_name: coll, kb_dir: getKb(), embedding_model: getEmb() });
+      show({ loading: true, url: u });
+      const data = await getJson(u);
+      show(data);
+    }
+  </script>
+</body>
+</html>

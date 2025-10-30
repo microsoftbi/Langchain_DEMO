@@ -196,11 +196,19 @@ class QAHandler(BaseHTTPRequestHandler):
     def log_message(self, format, *args):
         logger.info("%s - - [%s] %s" % (self.client_address[0], self.log_date_time_string(), format % args))
 
+    def do_OPTIONS(self):
+        self.send_response(HTTPStatus.NO_CONTENT)
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Methods", "GET, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        self.end_headers()
+
     def do_GET(self):
         parsed = urllib.parse.urlparse(self.path)
         if parsed.path != "/qa":
             self.send_response(HTTPStatus.NOT_FOUND)
             self.send_header("Content-Type", "application/json")
+            self.send_header("Access-Control-Allow-Origin", "*")
             self.end_headers()
             self.wfile.write(json.dumps({"error": "Not Found"}).encode("utf-8"))
             return
@@ -214,6 +222,7 @@ class QAHandler(BaseHTTPRequestHandler):
         if not question:
             self.send_response(HTTPStatus.BAD_REQUEST)
             self.send_header("Content-Type", "application/json")
+            self.send_header("Access-Control-Allow-Origin", "*")
             self.end_headers()
             self.wfile.write(json.dumps({"error": "Missing 'question' parameter"}).encode("utf-8"))
             return
@@ -238,17 +247,19 @@ class QAHandler(BaseHTTPRequestHandler):
             }
             self.send_response(HTTPStatus.OK)
             self.send_header("Content-Type", "application/json")
+            self.send_header("Access-Control-Allow-Origin", "*")
             self.end_headers()
             self.wfile.write(json.dumps(payload, ensure_ascii=False).encode("utf-8"))
         except Exception as e:
             logger.error(f"请求处理失败: {e}")
             self.send_response(HTTPStatus.INTERNAL_SERVER_ERROR)
             self.send_header("Content-Type", "application/json")
+            self.send_header("Access-Control-Allow-Origin", "*")
             self.end_headers()
             self.wfile.write(json.dumps({"error": "internal_error", "message": str(e)}).encode("utf-8"))
 
 
-def run_server(host: str = "0.0.0.0", port: int = int(os.getenv("PORT", "8000"))):
+def run_server(host: str = "0.0.0.0", port: int = int(os.getenv("PORT", "8008"))):
     httpd = HTTPServer((host, port), QAHandler)
     logger.info(f"QA 服务已启动: http://localhost:{port}/qa?question=...")
     httpd.serve_forever()
