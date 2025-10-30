@@ -9,6 +9,12 @@ from langchain_community.vectorstores import Chroma
 import requests
 from dotenv import load_dotenv
 
+"""
+加载知识库到 Chroma 向量数据库。
+"""
+
+
+
 load_dotenv()
 
 # 配置日志

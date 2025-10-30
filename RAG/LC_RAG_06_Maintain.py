@@ -14,6 +14,11 @@ from langchain_community.vectorstores import Chroma
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
+"""
+维护 Chroma 向量数据库的工具函数。
+"""
+
+
 load_dotenv()
 
 def _build_client(persist_path: str):
@@ -82,16 +87,6 @@ def list_chroma_collections(vectorstore_dir: str = "./RAG/chroma_db") -> Dict[st
     return results
 
 
-def _decode_unicode_escapes(text: str) -> str:
-    try:
-        return codecs.decode(text, 'unicode_escape')
-    except Exception:
-        try:
-            return bytes(text, 'utf-8').decode('unicode_escape')
-        except Exception:
-            return text
-
-
 def list_collection_sources(vectorstore_dir: str, collection_name: str) -> Dict[str, List[Dict[str, Any]]]:
     results: Dict[str, List[Dict[str, Any]]] = {}
     paths = _persist_paths(vectorstore_dir)
@@ -113,7 +108,7 @@ def list_collection_sources(vectorstore_dir: str, collection_name: str) -> Dict[
                 if isinstance(meta, dict):
                     src = meta.get("source") or meta.get("path")
                 if isinstance(src, str):
-                    src = _decode_unicode_escapes(src)
+                    src = src
                 else:
                     src = None
                 if not src:
@@ -151,7 +146,7 @@ def get_collection_entities(vectorstore_dir: str, collection_name: str, raw: boo
                 meta = metas[i] if i < len(metas) else {}
                 doc_val = docs[i] if i < len(docs) else None
                 if isinstance(doc_val, str):
-                    doc_val = _decode_unicode_escapes(doc_val)
+                    doc_val = doc_val
                 item: Dict[str, Any] = {
                     "id": id_,
                     "document": doc_val,

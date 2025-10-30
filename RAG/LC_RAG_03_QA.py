@@ -11,6 +11,12 @@ import dashscope
 from dashscope import Generation
 from http import HTTPStatus
 
+"""
+问答系统的python实现。
+在01代码执行后，运行本段代码。
+"""
+
+
 load_dotenv()
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")

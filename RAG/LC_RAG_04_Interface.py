@@ -13,6 +13,14 @@ from http import HTTPStatus
 import json
 from http.server import BaseHTTPRequestHandler, HTTPServer
 import urllib.parse
+from flask import Flask, request, jsonify
+
+
+"""
+问答系统的接口。
+在01代码执行后，运行本段代码。
+之后运行05 Client代码调用本接口。
+"""
 
 load_dotenv()
 
@@ -192,78 +200,54 @@ def answer_question(
     return answer.strip(), sources
 
 
-class QAHandler(BaseHTTPRequestHandler):
-    def log_message(self, format, *args):
-        logger.info("%s - - [%s] %s" % (self.client_address[0], self.log_date_time_string(), format % args))
+# ---------- Flask app ----------
+app = Flask(__name__)
+app.config['JSON_AS_ASCII'] = False
 
-    def do_OPTIONS(self):
-        self.send_response(HTTPStatus.NO_CONTENT)
-        self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Access-Control-Allow-Methods", "GET, OPTIONS")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type")
-        self.end_headers()
+@app.after_request
+def add_cors(resp):
+    resp.headers['Access-Control-Allow-Origin'] = '*'
+    resp.headers['Access-Control-Allow-Methods'] = 'GET, OPTIONS'
+    resp.headers['Access-Control-Allow-Headers'] = 'Content-Type'
+    return resp
 
-    def do_GET(self):
-        parsed = urllib.parse.urlparse(self.path)
-        if parsed.path != "/qa":
-            self.send_response(HTTPStatus.NOT_FOUND)
-            self.send_header("Content-Type", "application/json")
-            self.send_header("Access-Control-Allow-Origin", "*")
-            self.end_headers()
-            self.wfile.write(json.dumps({"error": "Not Found"}).encode("utf-8"))
-            return
+@app.get('/qa')
+def http_qa():
+    question = request.args.get('question',"哪些节假日应该安排休假？")
+    top_k = int(request.args.get('top_k', 5))
+    embedding_model = request.args.get('embedding_model', os.getenv('EMBEDDING_MODEL', 'text-embedding-v4'))
+    chat_model = request.args.get('chat_model', os.getenv('CHAT_MODEL', 'qwen-turbo'))
+    if not question:
+        return jsonify({"error": "Missing 'question' parameter"}), 400
+    try:
+        answer, sources = answer_question(
+            question=question,
+            top_k=top_k,
+            embedding_model=embedding_model,
+            chat_model=chat_model,
+            dashscope_api_key=os.getenv("DASHSCOPE_API_KEY"),
+            vectorstore_dir=os.getenv("VECTORSTORE_DIR", "./RAG/chroma_db"),
+        )
+        payload = {
+            "question": question,
+            "answer": answer,
+            "sources": sources,
+            "top_k": top_k,
+            "embedding_model": embedding_model,
+            "chat_model": chat_model,
+            "status": "ok",
+        }
+        return jsonify(payload), 200
+    except Exception as e:
+        logger.error(f"请求处理失败: {e}")
+        return jsonify({"error": "internal_error", "message": str(e)}), 500
 
-        qs = urllib.parse.parse_qs(parsed.query)
-        question = (qs.get("question") or [None])[0]
-        top_k = int((qs.get("top_k") or [5])[0])
-        embedding_model = (qs.get("embedding_model") or [os.getenv("EMBEDDING_MODEL", "text-embedding-v4")])[0]
-        chat_model = (qs.get("chat_model") or [os.getenv("CHAT_MODEL", "qwen-turbo")])[0]
+# ---------- Flask run helper ----------
 
-        if not question:
-            self.send_response(HTTPStatus.BAD_REQUEST)
-            self.send_header("Content-Type", "application/json")
-            self.send_header("Access-Control-Allow-Origin", "*")
-            self.end_headers()
-            self.wfile.write(json.dumps({"error": "Missing 'question' parameter"}).encode("utf-8"))
-            return
-
-        try:
-            answer, sources = answer_question(
-                question=question,
-                top_k=top_k,
-                embedding_model=embedding_model,
-                chat_model=chat_model,
-                dashscope_api_key=os.getenv("DASHSCOPE_API_KEY"),
-                vectorstore_dir=os.getenv("VECTORSTORE_DIR", "./RAG/chroma_db"),
-            )
-            payload = {
-                "question": question,
-                "answer": answer,
-                "sources": sources,
-                "top_k": top_k,
-                "embedding_model": embedding_model,
-                "chat_model": chat_model,
-                "status": "ok",
-            }
-            self.send_response(HTTPStatus.OK)
-            self.send_header("Content-Type", "application/json")
-            self.send_header("Access-Control-Allow-Origin", "*")
-            self.end_headers()
-            self.wfile.write(json.dumps(payload, ensure_ascii=False).encode("utf-8"))
-        except Exception as e:
-            logger.error(f"请求处理失败: {e}")
-            self.send_response(HTTPStatus.INTERNAL_SERVER_ERROR)
-            self.send_header("Content-Type", "application/json")
-            self.send_header("Access-Control-Allow-Origin", "*")
-            self.end_headers()
-            self.wfile.write(json.dumps({"error": "internal_error", "message": str(e)}).encode("utf-8"))
-
-
-def run_server(host: str = "0.0.0.0", port: int = int(os.getenv("PORT", "8008"))):
-    httpd = HTTPServer((host, port), QAHandler)
-    logger.info(f"QA 服务已启动: http://localhost:{port}/qa?question=...")
-    httpd.serve_forever()
+def run_flask_server(host: str = "0.0.0.0", port: int = int(os.getenv("PORT", "8008"))):
+    logger.info(f"Flask QA 服务已启动: http://localhost:{port}/qa?question=...")
+    app.run(host=host, port=port)
 
 
 if __name__ == "__main__":
-    run_server()
+    run_flask_server()

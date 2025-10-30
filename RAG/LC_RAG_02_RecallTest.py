@@ -7,6 +7,12 @@ from dotenv import load_dotenv
 from langchain_community.embeddings import DashScopeEmbeddings
 from langchain_community.vectorstores import Chroma
 
+"""
+测试召回知识库。
+在01代码执行后，运行本段代码。
+"""
+
+
 load_dotenv()
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
