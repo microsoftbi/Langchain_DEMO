@@ -187,10 +187,10 @@ def answer_question(
             if msg is None and isinstance(resp, dict):
                 msg = resp.get("message")
             logger.error(f"生成失败: status={status_code}, message={msg}")
-            answer = "对不起，生成答案时出现错误。"
+            answer = "ERRIR，生成答案时出现错误。"
     except Exception as e:
         logger.error(f"生成答案时出错: {e}")
-        answer = "对不起，生成答案时出现错误。"
+        answer = "ERROR，生成答案时出现错误。"
 
     return answer.strip(), sources
 
