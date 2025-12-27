@@ -1,10 +1,5 @@
-import os
 import gradio as gr
-from dotenv import load_dotenv
 from LC_RAG_03_QA import answer_question
-
-# 加载环境变量
-load_dotenv()
 
 def run_qa(question, top_k=5):
     """运行QA并返回结果"""
